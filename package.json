@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon --no-warnings server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "agenda": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "axios": "^1.7.9",
+    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.5.0",
+    "mongoose": "^8.9.3",
+    "nodemailer": "^6.10.0",
+    "nodemon": "^3.1.9",
+    "postcss": "^8.5.1",
+    "razorpay": "^2.9.6",
+    "react-hook-form": "^7.54.2",
+    "twilio": "^5.4.2"
+  }
+}
