@@ -39,11 +39,7 @@ const petSchema = new mongoose.Schema(
         name: {
           type: String,
           required: true,
-        },
-        numberOfDose: {
-          type: Number,
-          required: true,
-        },
+        }
       },
     ],
     registrationDate: {

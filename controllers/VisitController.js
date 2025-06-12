@@ -237,6 +237,7 @@ exports.getVisitDetails = async (req, res) => {
     console.log("Fetching visit with ID:", req.params.id);
 
     let Visit, Inventory;
+
     try {
       Visit = require("../models/Visit");
       console.log("Visit model loaded successfully");
@@ -661,7 +662,10 @@ exports.addVeterinaryVisit = async (req, res) => {
 
     const {payment}=details_new
 
-    if (items.length === 0 && tablets.length === 0 && ml.length === 0 && mg.length === 0) {
+    console.log(req.body);
+    
+
+    if (items?.length === 0 && tablets?.length === 0 && ml?.length === 0 && mg?.length === 0) {
       return res.json({
         success: false,
         message: "select atleast any to save the visit",
@@ -826,9 +830,10 @@ exports.addVeterinaryVisit = async (req, res) => {
       const bulkOps = [];
 
       // Update medicine stock
+      
       for (const med of items) {
-        const item = inventoryMap[med.id];
-        bulkOps.push({
+         const item = inventoryMap[med.id];
+         bulkOps.push({
           updateOne: {
             filter: { _id: item._id },
             update: { $inc: { stock: -med.quantity } },
@@ -923,8 +928,14 @@ exports.addVeterinaryVisit = async (req, res) => {
 
     await visit.save({ session });
 
-    const vaccineIds = vaccines.map((vac) => vac.id);
-    const vaccineItems = await Inventory.find({ _id: { $in: vaccineIds } })
+    const itemIds = items.map((item) => item.id);
+    const tabletIds = items.map((item) => item.id);
+    const mlIds = items.map((item) => item.id);
+    const mgIds = items.map((item) => item.id);
+
+    const medicationIds=[...itemIds,...tabletIds,...mlIds,...mgIds]
+
+    const vaccineItems = await Inventory.find({ _id: { $in: medicationIds } })
       .session(session)
       .lean();
 
@@ -934,24 +945,16 @@ exports.addVeterinaryVisit = async (req, res) => {
 
     // Step 3: Iterate through vaccineItems to update or add to vaccinations
     vaccineItems.forEach((item) => {
+
       const vaccineIndex = updatedVaccinations.findIndex(
         (vac) => vac.name === item.itemName // Assuming vaccineItems has a 'name' field
       );
 
       if (vaccineIndex !== -1) {
-        // Update existing vaccine
         updatedVaccinations[vaccineIndex] = {
-          name: item.itemName,
-          numberOfDose:
-           updatedVaccinations[vaccineIndex].numberOfDose+1, // Update dose or keep existing
+          name: item.itemName, 
         };
-      } else {
-        // Push new vaccine
-        updatedVaccinations.push({
-          name: item.itemName,
-          numberOfDose: 1, // Default to 1 if not provided
-        });
-      }
+      } 
     });
 
     // Step 4: Update the pet's vaccinations array in the database
