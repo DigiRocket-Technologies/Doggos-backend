@@ -649,10 +649,6 @@ exports.addVeterinaryVisit = async (req, res) => {
     const {
       petId,
       visitType,
-      items,
-      tablets,
-      ml,
-      mg,
       followUpPurpose,
       nextFollowUp,
       followUpTime,
@@ -660,9 +656,13 @@ exports.addVeterinaryVisit = async (req, res) => {
       details:details_new,
     } = req.body;
 
-    const {payment}=details_new
+    const {payment,
+       items,
+      tablets,
+      ml,
+      mg}=details_new
 
-    console.log(req.body);
+    console.log(items);
     
 
     if (items?.length === 0 && tablets?.length === 0 && ml?.length === 0 && mg?.length === 0) {
@@ -928,6 +928,8 @@ exports.addVeterinaryVisit = async (req, res) => {
 
     await visit.save({ session });
 
+    console.log("visit saved");
+
     const itemIds = items.map((item) => item.id);
     const tabletIds = items.map((item) => item.id);
     const mlIds = items.map((item) => item.id);
@@ -940,24 +942,32 @@ exports.addVeterinaryVisit = async (req, res) => {
       .lean();
 
     const pet = await Pet.findOne({ _id: petId });
+
+    console.log("he",vaccineItems);
     
-    const updatedVaccinations = [...pet.vaccinations]; // Copy existing vaccinations
+    const updatedVaccinations = [...pet.vaccinations]; 
 
-    // Step 3: Iterate through vaccineItems to update or add to vaccinations
-    vaccineItems.forEach((item) => {
-
-      const vaccineIndex = updatedVaccinations.findIndex(
-        (vac) => vac.name === item.itemName // Assuming vaccineItems has a 'name' field
-      );
-
-      if (vaccineIndex !== -1) {
-        updatedVaccinations[vaccineIndex] = {
-          name: item.itemName, 
-        };
-      } 
-    });
-
-    // Step 4: Update the pet's vaccinations array in the database
+  
+  vaccineItems.forEach((item) => {
+          const vaccineIndex = updatedVaccinations.findIndex(
+            (vac) => vac.name === item.itemName
+          );
+          
+          if (vaccineIndex !== -1) {
+            
+            updatedVaccinations[vaccineIndex] = {
+              name: item.itemName,
+            };
+          } else {
+            
+            updatedVaccinations.push({
+              name: item.itemName,
+            });
+          }
+        });
+ 
+  
+    
     pet.vaccinations=[...updatedVaccinations];
     await pet.save({session});
 
