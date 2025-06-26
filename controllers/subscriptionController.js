@@ -7,6 +7,54 @@ const Pet = require('./../models/pet');
 const Owner = require('./../models/Owner');
 
 
+
+exports.getPetsSubscription=async(req,res)=>{
+try {
+  console.log("controller called");
+    const {petId}=req.params;
+
+      if (!petId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pet ID is required'
+      });
+    }
+
+     const subscriptions = await Subscription.find({ petId: petId })
+  .populate({
+    path: 'planId',
+    populate: {
+      path: 'subscriptionType'
+    }
+  });
+
+     console.log(subscriptions);
+
+     if(!subscriptions){
+      return res.status(400).json({
+        success: false,
+        message: 'Pet has no subscription'
+      });
+     }
+
+      res.status(200).json({
+      success: true,
+      message: 'Pet subscriptions fetched successfully',
+      data: subscriptions,
+      count: subscriptions.length
+    });
+
+
+} catch (error) {
+     console.error('Error fetching pet subscriptions:', error);
+   res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+}
+}
+
 exports.getCustomerSubscriptions = async (req, res) => {
   try {
     const { email } = req.query;
@@ -147,7 +195,7 @@ exports.buySubscription = async (req, res) => {
 exports.getSubscriptionDetails = async (req, res) => {
   try {
     const { petId, visitType } = req.query;
-
+    
     if (!petId) {
       return res.status(400).json({
         success: false,
@@ -170,6 +218,8 @@ exports.getSubscriptionDetails = async (req, res) => {
         },
       },
     ])
+
+  
     
     subscriptions=subscriptions.filter((sub)=>sub.planId?.subscriptionType?.toString() === visitType.toString());
 

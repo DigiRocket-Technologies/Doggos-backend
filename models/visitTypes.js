@@ -18,7 +18,19 @@ const visitTypeSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    consultationPrice: {
+    consultationPricePvt: {
+      type: Number,
+      default: null,
+    },
+    consultationPriceNgo: {
+      type: Number,
+      default: null,
+    },
+    consultationPriceNGOEmergency: {
+      type: Number,
+      default: null,
+    },
+    consultationPricePvt: {
       type: Number,
       default: null,
     },

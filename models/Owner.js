@@ -17,11 +17,6 @@ const ownerSchema = new mongoose.Schema({
     type:String,
     required:false,
   },
-  segment: {
-    type: String,
-    enum: ['Day Care', 'Veterinary'],
-    required: false
-  },
   pets: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Pet'

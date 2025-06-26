@@ -15,6 +15,7 @@ const paymentRoutes=require("./routes/paaymentroutes")
 const customerServicesRoutes=require("./routes/CustomerServiceRoutes")
 const customerAppointment = require("./routes/CustomerAppointmentroutes")
 const onlineCustomer = require("./routes/OnlineCustomerRoutes");
+const prescription=require("./routes/Prescription")
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use("/api/v1/payments",paymentRoutes);
 app.use("/api/v1/customerservices",customerServicesRoutes);
 app.use("/api/v1/customerappointment",customerAppointment);
 app.use("/api/v1/appointment",onlineCustomer);
+app.use("/api/v1/prescription",prescription);
 
 
 // Start Server

@@ -555,10 +555,9 @@ exports.addDogParkVisit = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { petId, discount = 0, visitType, details: details_new,
-    } = req.body;
+    const { petId, discount = 0, visitType, details: details_new } = req.body;
 
-    const {payment}=details_new;
+    const { payment } = details_new;
 
     if (!petId) {
       return res.json({
@@ -592,7 +591,7 @@ exports.addDogParkVisit = async (req, res) => {
     // Create a new visit record
     const details = {};
     details.price = visitDetails.price - discount;
-    details.payment=payment;
+    details.payment = payment;
 
     const visit = new Visit({
       pet: petId,
@@ -602,32 +601,11 @@ exports.addDogParkVisit = async (req, res) => {
 
     await visit.save({ session });
 
-    const boardingDetails = await Boarding.findOne({
-      petId,
-      isBoarded: true,
-    }).populate({ path: "boardingType", select: "purpose" });
-
-    if (boardingDetails) {
-      return res.json({
-        success: false,
-        message: `Pet has already been boarded in ${boardingDetails?.boardingType?.purpose}`,
-      });
-    }
-
-    const boarding = new Boarding({
-      boardingType: visitType,
-      visitId: visit?._id,
-      petId,
-      entryTime: new Date(),
-    });
-
-    await boarding.save({ session });
-
     await session.commitTransaction();
 
     return res.json({
       success: true,
-      message: `Pet has been boarded in ${visitDetails?.purpose} successfully`,
+      message: `Pet has been added in visits successfully`,
     });
   } catch (error) {
     console.log("error in addDogParkVisit controller", error);
@@ -646,279 +624,33 @@ exports.addVeterinaryVisit = async (req, res) => {
   session.startTransaction();
 
   try {
-    const {
-      petId,
-      visitType,
-      followUpPurpose,
-      nextFollowUp,
-      followUpTime,
-      customerType,
-      details:details_new,
-    } = req.body;
+    const { petId, visitType, customerType, payment } = req.body;
 
-    const {payment,
-       items,
-      tablets,
-      ml,
-      mg}=details_new
-
-    console.log(items);
-    
-
-    if (items?.length === 0 && tablets?.length === 0 && ml?.length === 0 && mg?.length === 0) {
+    if (!petId) {
       return res.json({
         success: false,
-        message: "select atleast any to save the visit",
+        message: "A pet must be selected to save a visit",
       });
     }
 
-    if (nextFollowUp && followUpPurpose && followUpTime) {
-      const newscheduledVisit = new scheduledVisit({
-        date: new Date(nextFollowUp),
-        time: followUpTime,
-        petId,
-        purpose: followUpPurpose,
-      });
-
-      await newscheduledVisit.save({ session });
-    }
-    
-    else if (!nextFollowUp && !followUpPurpose && !followUpTime) {
-    
-    } else {
+    if (!visitType) {
       return res.json({
-        succes: false,
-        message: "Please fill all followup details",
+        success: false,
+        message: "A visittype must be selected to save visit",
       });
     }
 
-    const calculateTotalPriceAndUpdateStock = async () => {
-      const itemIds = items.map((it) => it.id);
-      const TabIds = tablets.map((tb) => tb.id);
-      const MlIds = ml.map((m) => m.id);
-      const MgIds = mg.map((g) => g.id);
-      const allIds = [...new Set([...itemIds, ...TabIds, ...MlIds, ...MgIds])]; 
-
-      
-      const inventoryItems = await Inventory.find({ _id: { $in: allIds } })
-        .session(session)
-        .lean();
-
-    
-      const inventoryMap = inventoryItems.reduce((map, item) => {
-        map[item._id.toString()] = item;
-        return map;
-      }, {});
-
-      //items k liy
-      let itemTotal = 0;
-      for (const med of items) {
-        const item = inventoryMap[med.id];
-        if (!item) {
-          throw new Error(`Inventory item with ID ${med.id} not found`);
-        }
-        if (!med.id || !med.quantity || med.quantity <= 0) {
-          throw new Error(
-            "Each item must have a valid ID and positive quantity"
-          );
-        }
-        if (item.stock < med.quantity) {
-          throw new Error(`Insufficient stock for ${item.name}`);
-        }
-        const price =
-          customerType === "NGO"
-            ? item.unitMinRetailPriceNGO
-            : item.unitMaxRetailPriceCustomer;
-        itemTotal += price * med.quantity;
-      }
-
-// tablets k liy
-       let tabletsTotal = 0;
-      for (const tb of tablets) {
-        const tablet = inventoryMap[tb.id];
-        if (!tablet) {
-          throw new Error(`Inventory item with ID ${tb.id} not found`);
-        }
-        if (!tb.id || !tb.quantity || tb.quantity <= 0) {
-          throw new Error(
-            "Each item must have a valid ID and positive quantity"
-          );
-        }
-        if (tablet.stock < tb.quantity) {
-          throw new Error(`Insufficient stock for ${item.name}`);
-        }
-        const price =
-          customerType === "NGO"
-            ? tablet.unitMinRetailPriceNGO
-            : tablet.unitMaxRetailPriceCustomer;
-        tabletsTotal += price * tb.quantity;
-      }
-
-// ml k liy
-       let MlTotal = 0;
-      for (const m of ml) {
-        const mll = inventoryMap[m.id];
-        if (!mll) {
-          throw new Error(`Inventory item with ID ${m.id} not found`);
-        }
-        if (!m.id || !m.quantity || m.quantity <= 0) {
-          throw new Error(
-            "Each item must have a valid ID and positive quantity"
-          );
-        }
-        if (mll.stock < m.quantity) {
-          throw new Error(`Insufficient stock for ${mll.name}`);
-        }
-        const price =
-          customerType === "NGO"
-            ? mll.unitMinRetailPriceNGO
-            : mll.unitMaxRetailPriceCustomer;
-        MlTotal += price * m.quantity;
-      }
-
-
-      // mg k liy
-       let mgTotal = 0;
-      for (const g of mg) {
-        const mgg = inventoryMap[g.id];
-        if (!mgg) {
-          throw new Error(`Inventory mgg with ID ${g.id} not found`);
-        }
-        if (!g.id || !g.quantity || g.quantity <= 0) {
-          throw new Error(
-            "Each mgg must have a valid ID and positive quantity"
-          );
-        }
-        if (mgg.stock < g.quantity) {
-          throw new Error(`Insufficient stock for ${mgg.name}`);
-        }
-        const price =
-          customerType === "NGO"
-            ? mgg.unitMinRetailPriceNGO
-            : mgg.unitMaxRetailPriceCustomer;
-        mgTotal += price * g.quantity;
-      }
-
-
-      // Validate and calculate vaccine total
-      // let tabletsTotal = 0;
-      // for (const vac of tablets) {
-      //   const Tablet = inventoryMap[vac.id];
-      //   if (!Tablet) {
-      //     throw new Error(`Inventory item with ID ${vac.id} not found`);
-      //   }
-      //   if (!vac.id || !vac.volume || vac.volume <= 0) {
-      //     throw new Error(
-      //       "Each vaccine must have a valid ID and positive volume"
-      //     );
-      //   }
-      //   const requiredStock = vac.volume / Tablet.volumeML;
-      //   if (vaccine.stockUnit < requiredStock) {
-      //     throw new Error(`Insufficient stock for ${vaccine.name}`);
-      //   }
-      //   if (vaccine.totalVolume < vac.volume) {
-      //     throw new Error(`Insufficient volume for vaccine: ${vaccine.name}`);
-      //   }
-      //   const price =
-      //     customerType === "NGO"
-      //       ? vaccine.unitMinRetailPriceNGO
-      //       : vaccine.unitMaxRetailPriceCustomer;
-      //   vaccineTotal += price * vac.volume;
-      // }
-
-      // Prepare bulk updates
-      const bulkOps = [];
-
-      // Update medicine stock
-      
-      for (const med of items) {
-         const item = inventoryMap[med.id];
-         bulkOps.push({
-          updateOne: {
-            filter: { _id: item._id },
-            update: { $inc: { stock: -med.quantity } },
-          },
-        });
-      }
-
-       for (const med of tablets) {
-        const item = inventoryMap[med.id];
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: item._id },
-            update: { $inc: { stock: -med.quantity } },
-          },
-        });
-      }
-
-       for (const med of ml) {
-        const item = inventoryMap[med.id];
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: item._id },
-            update: { $inc: { stock: -med.quantity } },
-          },
-        });
-      }
-
-       for (const med of mg) {
-        const item = inventoryMap[med.id];
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: item._id },
-            update: { $inc: { stock: -med.quantity } },
-          },
-        });
-      }
-
-      // Update vaccine stock and volume
-      // for (const vac of vaccines) {
-      //   const vaccine = inventoryMap[vac.id];
-      //   const requiredStock = vac.volume / vaccine.volumeML;
-      //   bulkOps.push({
-      //     updateOne: {
-      //       filter: { _id: vaccine._id },
-      //       update: {
-      //         $inc: {
-      //           stockUnit: -requiredStock,
-      //           totalVolume: -vac.volume,
-      //         },
-      //         $set: {
-      //           stockUnit:
-      //             vaccine.totalVolume - vac.volume <= 0 ? 0 : undefined,
-      //         },
-      //       },
-      //     },
-      //   });
-      // }
-
-      // Execute bulk updates
-      if (bulkOps.length > 0) {
-        await Inventory.bulkWrite(bulkOps, { session });
-      }
-
-      // Return total price
-      return itemTotal + tabletsTotal + MlTotal + mgTotal;
-    };
-
-    const totalPrice = await calculateTotalPriceAndUpdateStock();
+    if (!customerType) {
+      return res.json({
+        success: false,
+        message: "A customertype must be selected to save visit",
+      });
+    }
 
     // Create a new visit record
     const details = {};
-    details.items = items.length ? items : null;
-    details.tablets = tablets.length ? tablets : null;
-    details.ml = ml.length ? ml : null;
-    details.mg = mg.length ? mg : null;
-
-    details.nextFollowUp =
-      nextFollowUp && followUpTime
-        ? new Date(`${nextFollowUp}T${followUpTime}`)
-        : null;
-    details.followUpPurpose = followUpPurpose ? followUpPurpose : "";
     details.customerType = customerType;
-    details.price = totalPrice;
-    details.payment=payment
-    
+    details.payment = payment;
 
     const visit = new Visit({
       pet: petId,
@@ -927,49 +659,6 @@ exports.addVeterinaryVisit = async (req, res) => {
     });
 
     await visit.save({ session });
-
-    console.log("visit saved");
-
-    const itemIds = items.map((item) => item.id);
-    const tabletIds = items.map((item) => item.id);
-    const mlIds = items.map((item) => item.id);
-    const mgIds = items.map((item) => item.id);
-
-    const medicationIds=[...itemIds,...tabletIds,...mlIds,...mgIds]
-
-    const vaccineItems = await Inventory.find({ _id: { $in: medicationIds } })
-      .session(session)
-      .lean();
-
-    const pet = await Pet.findOne({ _id: petId });
-
-    console.log("he",vaccineItems);
-    
-    const updatedVaccinations = [...pet.vaccinations]; 
-
-  
-  vaccineItems.forEach((item) => {
-          const vaccineIndex = updatedVaccinations.findIndex(
-            (vac) => vac.name === item.itemName
-          );
-          
-          if (vaccineIndex !== -1) {
-            
-            updatedVaccinations[vaccineIndex] = {
-              name: item.itemName,
-            };
-          } else {
-            
-            updatedVaccinations.push({
-              name: item.itemName,
-            });
-          }
-        });
- 
-  
-    
-    pet.vaccinations=[...updatedVaccinations];
-    await pet.save({session});
 
     await session.commitTransaction();
     return res.json({
@@ -1000,11 +689,10 @@ exports.addHostelVisit = async (req, res) => {
       planId,
       price,
       visitType,
-       details: details_new,
+      details: details_new,
     } = req.body;
 
-
-    const {payment}=details_new;
+    const { payment } = details_new;
 
     let pricee = price;
 
@@ -1014,7 +702,6 @@ exports.addHostelVisit = async (req, res) => {
         message: "A pet must be selected to save a visit",
       });
     }
-       
 
     if (!visitType) {
       return res.json({
@@ -1044,14 +731,6 @@ exports.addHostelVisit = async (req, res) => {
 
       pricee = (Hostel?.price - discount) * numberOfDays;
     }
-    //  else {
-    //   console.log("hii")
-    //   return res.json({
-    //     success: false,
-    //     message: "Either avail subscription or buy for some days",
-    //   });
-    // }
-     
 
     const details = {};
 
@@ -1060,8 +739,7 @@ exports.addHostelVisit = async (req, res) => {
     details["numberOfDays"] = numberOfDays;
     details["discount"] = discount;
 
-    details.payment=payment;
-
+    details.payment = payment;
 
     const visit = new Visit({
       pet: petId,
@@ -1109,7 +787,7 @@ exports.addDayCareVisit = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { petId, discount = 0, visitType, details} = req.body;
+    const { petId, discount = 0, visitType, details } = req.body;
 
     if (!petId) {
       return res.json({
@@ -1140,9 +818,7 @@ exports.addDayCareVisit = async (req, res) => {
       });
     }
 
-  
     details.price = visitDetails?.price - discount;
-   
 
     const visit = new Visit({
       pet: petId,
@@ -1184,18 +860,7 @@ exports.addDaySchoolVisit = async (req, res) => {
   session.startTransaction();
 
   try {
-    const {
-      petId,
-      discount = 0,
-      isSubscriptionAvailed,
-      planId,
-      visitType,
-      details: details_new,
-    } = req.body;
-
-    const {payment}=details_new;
-
-    let price = 0;
+    const { petId, isSubscriptionAvailed, planId, visitType } = req.body;
 
     if (!petId) {
       return res.json({
@@ -1211,6 +876,18 @@ exports.addDaySchoolVisit = async (req, res) => {
       });
     }
 
+    const boardingDetails = await Boarding.findOne({
+      petId,
+      isBoarded: true,
+    }).populate({ path: "boardingType", select: "purpose" });
+
+    if (boardingDetails) {
+      return res.status(400).json({
+        success: false,
+        message: `Pet is already boarded in ${boardingDetails?.boardingType?.purpose}`,
+      });
+    }
+
     const visitDetails = await VisitType.findOne({ _id: visitType });
 
     if (isSubscriptionAvailed) {
@@ -1221,20 +898,11 @@ exports.addDaySchoolVisit = async (req, res) => {
           message: "No subscription exist for given pet",
         });
       }
-      price = 0;
-    } else {
-      if (discount >= visitDetails?.price) {
-        return res.json({
-          success: false,
-          message: "Discount must be less than original price",
-        });
-      }
-      price = visitDetails?.price - discount;
     }
 
     details = {};
-    details.price = price;
-    details.payment=payment;
+    details["issubscriptionavailed"] = isSubscriptionAvailed;
+    details["planId"] = planId;
 
     const visit = new Visit({
       pet: petId,
@@ -1277,20 +945,7 @@ exports.addPlaySchoolVisit = async (req, res) => {
   session.startTransaction();
 
   try {
-    const {
-      petId,
-      discount = 0,
-      isSubscriptionAvailed,
-      planId,
-      visitType,
-      details: details_new,
-    } = req.body;
-
-    const {payment}=details_new;
-
-    console.log(planId)
-
-    let price = 0;
+    const { petId, isSubscriptionAvailed, planId, visitType } = req.body;
 
     if (!petId) {
       return res.json({
@@ -1316,22 +971,23 @@ exports.addPlaySchoolVisit = async (req, res) => {
           message: "No subscription exist for given pet",
         });
       }
-      price = 0;
-    } else {
-      if (discount >= visitDetails?.price) {
-        return res.json({
-          success: false,
-          message: "Discount must be less than original price",
-        });
-      }
-      price = visitDetails?.price - discount;
+    }
+
+    const boardingDetails = await Boarding.findOne({
+      petId,
+      isBoarded: true,
+    }).populate({ path: "boardingType", select: "purpose" });
+
+    if (boardingDetails) {
+      return res.status(400).json({
+        success: false,
+        message: `Pet is already boarded in ${boardingDetails?.boardingType?.purpose}`,
+      });
     }
 
     details = {};
-    details.price = price;
-     details.payment=payment;
-
-     console.log("hi");
+    details["issubscriptionAvailed"] = isSubscriptionAvailed;
+    details["planId"] = planId;
 
     const visit = new Visit({
       pet: petId,
@@ -1472,6 +1128,9 @@ exports.getVisitList = async (req, res) => {
           ...(name ? { "pet.name": { $regex: name, $options: "i" } } : {}),
         },
       },
+      {
+        $sort: { createdAt: -1 }, // descending order
+      },
     ];
 
     const List = await Visit.aggregate(aggregatePipeline);
@@ -1532,7 +1191,6 @@ exports.getScheduledVisit = async (req, res) => {
 exports.addGroomingVisit = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
- 
 
   try {
     const {
@@ -1541,11 +1199,11 @@ exports.addGroomingVisit = async (req, res) => {
       isSubscriptionAvailed,
       planId,
       visitType,
-     details : details_new, 
+      details: details_new,
     } = req.body;
 
-    const {payment}=details_new;
-    console.log("payment",payment);
+    const { payment } = details_new;
+    console.log("payment", payment);
 
     let price = 0;
 
@@ -1563,7 +1221,7 @@ exports.addGroomingVisit = async (req, res) => {
       });
     }
 
-     console.log("hi2");
+    console.log("hi2");
 
     const visitDetails = await VisitType.findOne({ _id: visitType });
     details = {};
@@ -1596,13 +1254,13 @@ exports.addGroomingVisit = async (req, res) => {
       price = visitDetails?.price - discount;
     }
 
-     console.log("hi3");
+    console.log("hi3");
 
     details.price = price;
-    details.payment=payment;
+    details.payment = payment;
 
-     console.log("hi4");
-     
+    console.log("hi4");
+
     console.log(details);
     const visit = new Visit({
       pet: petId,
@@ -1669,8 +1327,8 @@ exports.getBoardingCategoryList = async (req, res) => {
 
 exports.addShoppingVisit = async (req, res) => {
   try {
-    const { items, petId, visitType, details:details_new } = req.body;
-    const {payment} =details_new
+    const { items, petId, visitType, details: details_new } = req.body;
+    const { payment } = details_new;
 
     if (!petId) {
       return res.json({
@@ -1709,7 +1367,7 @@ exports.addShoppingVisit = async (req, res) => {
     details = {};
     details.price = price;
     details.items = items;
-    details.payment=payment
+    details.payment = payment;
 
     const newVisit = new Visit({
       visitType,
@@ -1733,4 +1391,26 @@ exports.addShoppingVisit = async (req, res) => {
   }
 };
 
+exports.getParticularPetVisit = async (req, res) => {
+  try {
+    const { petId } = req.query;
 
+    const List = await Visit.find({ pet: petId }).populate([
+      { path: "pet" },
+      { path: "visitType" },
+    ]);
+
+    return res.json({
+      success: true,
+      List,
+      message: "List fetched successfullly",
+    });
+  } catch (error) {
+    console.log("error in get perticular visit list controller", error);
+    await session.abortTransaction();
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
